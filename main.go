@@ -2,36 +2,43 @@ package main
 
 import (
 	"log"
+	"os"
 	"sync"
+
+	"github.com/jmv1006/go-message-queue/metrics"
 
 	mesage_queue "github.com/jmv1006/go-message-queue/message_queue"
 )
-
-/*
-TODO
-1. Listen for messages & store them
-	- producers will connect to this endpoint & write to it
-2. Alert any consumers of new messages (push)
- 	- consumers will connect to the same endpoint & read from it
-*/
 
 func main() {
 
 	var wg sync.WaitGroup
 
+	listenerAddress := os.Getenv("LISTENER_ADDRESS")
+
+	if listenerAddress == "" {
+		listenerAddress = "localhost:8000" // default
+	}
+
+	mh := metrics.NewMetricsHandler()
+
 	// Creating MQ
-	wg.Add(1)
+	wg.Add(2)
 
 	mqConfig := mesage_queue.MessageQueueConfig{
-		Address:  "localhost:8000",
-		Protocol: "tcp",
-		Wg:       &wg,
+		Address:        listenerAddress,
+		Protocol:       "tcp",
+		Wg:             &wg,
+		MetricsHandler: mh,
 	}
 
 	mq := mesage_queue.New(mqConfig)
 
 	// Starting a listener for producers
-	mq.Start()
+	go mq.Start()
+
+	// Starting metrics handler
+	go mh.StartMetricsLoop(10)
 
 	log.Printf("Listening for tcp connections on port %s...", "8000")
 

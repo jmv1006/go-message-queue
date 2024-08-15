@@ -2,19 +2,24 @@ package mesage_queue
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
-	"github.com/google/uuid"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/jmv1006/go-message-queue/metrics"
 )
 
 type MessageQueueConfig struct {
-	Address  string
-	Protocol string
-	Wg       *sync.WaitGroup
+	Address        string
+	Protocol       string
+	Wg             *sync.WaitGroup
+	MetricsHandler *metrics.MetricsHandler
 }
 
 type MessageQueue struct {
@@ -62,17 +67,18 @@ func (mq *MessageQueue) Start() {
 			return
 		}
 
-		go mq.handleMessage(buf, &conn)
+		mq.handleMessage(buf, &conn)
 	}
 
 }
 
 func (mq *MessageQueue) handleMessage(msg bytes.Buffer, connPtr *net.Conn) {
-
+	conn := *connPtr
 	standardReq := Decode(msg.Bytes())
 
 	if standardReq == nil {
 		log.Println("message not valid")
+		conn.Close()
 		return
 	}
 
@@ -92,10 +98,18 @@ func (mq *MessageQueue) ProduceMessage(msg *StandardRequest, connPtr *net.Conn) 
 	body := msg.Body
 	conn := *connPtr
 
+	if len([]byte(body)) > 1000 {
+		log.Printf("recieved msg over 1000 bytes")
+		return
+	}
+
 	queueMsg := Message{
 		Timestamp: time.Now().Format(time.RFC3339),
 		Payload:   body,
 	}
+
+	// metrics
+	mq.cfg.MetricsHandler.AddReceived()
 
 	// Notifying channels
 	mq.NotifyConsumers(queueMsg)
@@ -115,13 +129,17 @@ func (mq *MessageQueue) CreateConsumerStream(connPtr *net.Conn) {
 	consumerChan := make(chan Message)
 	id := uuid.New()
 
+	mq.channels[id.String()] = consumerChan
+	// metrics
+	mq.cfg.MetricsHandler.AddChannel()
+
 	defer func() {
 		conn.Close()
+		fmt.Println("EXITING")
+		mq.cfg.MetricsHandler.RemoveChannel()
 		delete(mq.channels, id.String())
-		log.Printf("deleted channel %s", id.String())
-	}()
 
-	mq.channels[id.String()] = consumerChan
+	}()
 
 	log.Printf("consumer %s connected to server", conn.LocalAddr())
 
@@ -130,7 +148,11 @@ func (mq *MessageQueue) CreateConsumerStream(connPtr *net.Conn) {
 		// marshal message
 		jsonMsg, _ := json.Marshal(msg)
 
-		_, err := conn.Write(jsonMsg)
+		resultMsg := make([]byte, 1000)
+
+		base64.StdEncoding.Encode(resultMsg, jsonMsg)
+
+		_, err := conn.Write(resultMsg)
 
 		if err != nil {
 			log.Printf("error producing message: %s", err)
@@ -140,9 +162,31 @@ func (mq *MessageQueue) CreateConsumerStream(connPtr *net.Conn) {
 
 }
 
+func (mq *MessageQueue) handleChannelClosure(ch chan Message, connPtr *net.Conn) {
+	// Check if connection is alive every 3 seconds
+	conn := *connPtr
+
+	for {
+		_, err := conn.Read(make([]byte, 1))
+
+		if err != nil {
+			if err == io.EOF {
+				continue // Connection was closed by the peer
+			}
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				continue // Connection is still open, but timed out
+			}
+
+			close(ch)
+			return
+		}
+	}
+
+}
+
 func (mq *MessageQueue) NotifyConsumers(msg Message) {
 	for id, channel := range mq.channels {
-		log.Printf("Notifying channel %s of message", id)
+		log.Printf("notifying channel %s of message", id)
 		channel <- msg
 	}
 }

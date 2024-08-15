@@ -1,6 +1,7 @@
 package mesage_queue
 
 import (
+	"encoding/base64"
 	"encoding/json"
 )
 
@@ -9,7 +10,13 @@ import (
 func Decode(msg []byte) *StandardRequest {
 	var standardReq StandardRequest
 
-	err := json.Unmarshal(msg, &standardReq)
+	data, err := base64.StdEncoding.DecodeString(string(msg))
+
+	if err != nil {
+		return nil
+	}
+
+	err = json.Unmarshal(data, &standardReq)
 
 	if err != nil {
 		return nil
