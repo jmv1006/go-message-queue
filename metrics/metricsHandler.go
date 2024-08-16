@@ -39,6 +39,7 @@ func (m *MetricsHandler) StartMetricsLoop(delayInSeconds int) {
 		log.Printf("%d events recieved", m.Received)
 		log.Printf("%d events sent", m.Sent)
 		log.Printf("%d active channels", m.ActiveChannels)
+		log.Printf("--------------------")
 
 		time.Sleep(duration)
 	}
