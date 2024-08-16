@@ -108,7 +108,9 @@ func (mq *MessageQueue) CreateConsumerStream(connPtr *net.TCPConn) {
 	mq.mu.Lock()
 
 	// metrics
+	mq.mu.Unlock()
 	mq.cfg.MetricsHandler.AddChannel()
+	mq.mu.Lock()
 
 	defer func() {
 		// Closing Connection
@@ -117,8 +119,11 @@ func (mq *MessageQueue) CreateConsumerStream(connPtr *net.TCPConn) {
 			log.Printf("%s", err)
 			return
 		}
+
 		// Remove channel from metrics count
+		mq.mu.Unlock()
 		mq.cfg.MetricsHandler.RemoveChannel()
+		mq.mu.Lock()
 
 		// Deleting channel from map
 		mq.mu.Unlock()
@@ -180,7 +185,9 @@ func (mq *MessageQueue) ProduceMessage(msg *StandardRequest, connPtr *net.TCPCon
 	}
 
 	// metrics
+	mq.mu.Unlock()
 	mq.cfg.MetricsHandler.AddReceived()
+	mq.mu.Lock()
 
 	// Notifying channels
 	mq.NotifyConsumers(queueMsg)
