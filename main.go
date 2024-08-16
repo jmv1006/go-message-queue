@@ -22,7 +22,7 @@ func main() {
 
 	mh := metrics.NewMetricsHandler()
 
-	// Creating MQ
+	// Creating WG
 	wg.Add(2)
 
 	mqConfig := mesage_queue.MessageQueueConfig{

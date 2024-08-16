@@ -5,8 +5,7 @@ import (
 	"encoding/json"
 )
 
-// Decode takes in a raw TCP message, decodes it, and returns the message as a string
-// and it's type (consumer or publish)
+// Decode takes in a raw slice of bytes, decodes them, and returns the data as a StandardRequest
 func Decode(msg []byte) *StandardRequest {
 	var standardReq StandardRequest
 
