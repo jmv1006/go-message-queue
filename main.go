@@ -38,9 +38,9 @@ func main() {
 	go mq.Start()
 
 	// Starting metrics handler
-	go mh.StartMetricsLoop(10)
+	go mh.StartMetricsLoop(10, mq.GetMutex())
 
-	log.Printf("Listening for tcp connections on port %s...", "8000")
+	log.Printf("Listening for tcp connections on %s TCP...", listenerAddress)
 
 	wg.Wait()
 }
