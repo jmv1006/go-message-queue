@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"log"
+	"sync"
 	"time"
 )
 
@@ -31,15 +32,18 @@ func (m *MetricsHandler) RemoveChannel() {
 	m.ActiveChannels -= 1
 }
 
-func (m *MetricsHandler) StartMetricsLoop(delayInSeconds int) {
+func (m *MetricsHandler) StartMetricsLoop(delayInSeconds int, mqMutex *sync.Mutex) {
 	duration := time.Second * time.Duration(delayInSeconds)
 
 	for {
+		mqMutex.Lock()
 		// Print metrics
 		log.Printf("%d events recieved", m.Received)
 		log.Printf("%d events sent", m.Sent)
 		log.Printf("%d active channels", m.ActiveChannels)
 		log.Printf("--------------------")
+
+		mqMutex.Unlock()
 
 		time.Sleep(duration)
 	}

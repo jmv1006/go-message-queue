@@ -2,14 +2,11 @@ package mesage_queue
 
 import (
 	"bufio"
-	"encoding/base64"
-	"encoding/json"
 	"log"
 	"net"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jmv1006/go-message-queue/metrics"
 )
 
@@ -43,9 +40,6 @@ func New(config MessageQueueConfig) *MessageQueue {
 func (mq *MessageQueue) Start() {
 	defer mq.cfg.Wg.Done()
 
-	// Locking mutex to start
-	mq.mu.Lock()
-
 	addr, err := net.ResolveTCPAddr(mq.cfg.Protocol, mq.cfg.Address)
 
 	if err != nil {
@@ -68,7 +62,7 @@ func (mq *MessageQueue) Start() {
 			continue
 		}
 
-		// handle this connection on another threat
+		// handle this connection on another thread
 		go mq.handleConnection(conn)
 	}
 
@@ -95,66 +89,6 @@ func (mq *MessageQueue) handleConnection(connPtr *net.TCPConn) {
 
 }
 
-func (mq *MessageQueue) CreateConsumerStream(connPtr *net.TCPConn) {
-	conn := *connPtr
-
-	// Create a new channel
-	consumerChan := make(chan Message)
-	id := uuid.New()
-
-	// Updating channels map
-	mq.mu.Unlock()
-	mq.channels[id.String()] = consumerChan
-	mq.mu.Lock()
-
-	// metrics
-	mq.mu.Unlock()
-	mq.cfg.MetricsHandler.AddChannel()
-	mq.mu.Lock()
-
-	defer func() {
-		// Closing Connection
-		err := conn.Close()
-		if err != nil {
-			log.Printf("%s", err)
-			return
-		}
-
-		// Remove channel from metrics count
-		mq.mu.Unlock()
-		mq.cfg.MetricsHandler.RemoveChannel()
-		mq.mu.Lock()
-
-		// Deleting channel from map
-		mq.mu.Unlock()
-		delete(mq.channels, id.String())
-		mq.mu.Lock()
-	}()
-
-	log.Printf("consumer %s connected to server", conn.LocalAddr())
-
-	// Heartbeat checker
-	go mq.checkConnectionHeartbeat(connPtr, consumerChan)
-
-	// Listen for queue updates - does not stop until the channel is closed
-	for msg := range consumerChan {
-		// marshal message
-		jsonMsg, _ := json.Marshal(msg)
-
-		resultMsg := make([]byte, 1000)
-
-		base64.StdEncoding.Encode(resultMsg, jsonMsg)
-
-		_, err := conn.Write(resultMsg)
-
-		if err != nil {
-			log.Printf("error producing message: %s", err)
-			return
-		}
-	}
-
-}
-
 func (mq *MessageQueue) checkConnectionHeartbeat(conn *net.TCPConn, channel chan Message) {
 	for {
 		one := make([]byte, 1)
@@ -170,40 +104,6 @@ func (mq *MessageQueue) checkConnectionHeartbeat(conn *net.TCPConn, channel chan
 	}
 }
 
-func (mq *MessageQueue) ProduceMessage(msg *StandardRequest, connPtr *net.TCPConn) {
-	body := msg.Body
-	conn := *connPtr
-
-	if len([]byte(body)) > 1000 {
-		log.Printf("recieved msg over 1000 bytes")
-		return
-	}
-
-	queueMsg := Message{
-		Timestamp: time.Now().Format(time.RFC3339),
-		Payload:   body,
-	}
-
-	// metrics
-	mq.mu.Unlock()
-	mq.cfg.MetricsHandler.AddReceived()
-	mq.mu.Lock()
-
-	// Notifying channels
-	mq.NotifyConsumers(queueMsg)
-
-	err := conn.Close()
-
-	if err != nil {
-		log.Printf("error with closing connection: %s", err)
-		return
-	}
-}
-
-func (mq *MessageQueue) NotifyConsumers(msg Message) {
-
-	for id, channel := range mq.channels {
-		log.Printf("notifying channel %s of message", id)
-		channel <- msg
-	}
+func (mq *MessageQueue) GetMutex() *sync.Mutex {
+	return &mq.mu
 }
