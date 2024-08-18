@@ -17,7 +17,7 @@ func main() {
 	listenerAddress := os.Getenv("LISTENER_ADDRESS")
 
 	if listenerAddress == "" {
-		listenerAddress = "localhost:8000" // default
+		listenerAddress = "0.0.0.0:8000" // default
 	}
 
 	mh := metrics.NewMetricsHandler()
@@ -30,6 +30,7 @@ func main() {
 		Protocol:       "tcp",
 		Wg:             &wg,
 		MetricsHandler: mh,
+		Debug:          false,
 	}
 
 	mq := mesage_queue.New(mqConfig)
@@ -38,9 +39,9 @@ func main() {
 	go mq.Start()
 
 	// Starting metrics handler
-	go mh.StartMetricsLoop(10)
+	go mh.StartMetricsLoop(10, mq.GetMutex())
 
-	log.Printf("Listening for tcp connections on port %s...", "8000")
+	log.Printf("Listening for tcp connections on %s TCP...", listenerAddress)
 
 	wg.Wait()
 }

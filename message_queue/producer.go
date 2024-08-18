@@ -7,8 +7,13 @@ import (
 )
 
 func (mq *MessageQueue) ProduceMessage(msg *StandardRequest, connPtr *net.TCPConn) {
-	body := msg.Body
 	conn := *connPtr
+
+	body := msg.Body
+	topicName := msg.Topic
+
+	// check if topic exists
+	topic := mq.ValidateTopic(topicName)
 
 	if len([]byte(body)) > 1000 {
 		log.Printf("recieved msg over 1000 bytes")
@@ -26,7 +31,7 @@ func (mq *MessageQueue) ProduceMessage(msg *StandardRequest, connPtr *net.TCPCon
 	mq.mu.Unlock()
 
 	// Notifying channels
-	mq.NotifyConsumers(queueMsg)
+	mq.NotifyConsumers(topic, queueMsg)
 
 	err := conn.Close()
 
@@ -36,11 +41,11 @@ func (mq *MessageQueue) ProduceMessage(msg *StandardRequest, connPtr *net.TCPCon
 	}
 }
 
-func (mq *MessageQueue) NotifyConsumers(msg Message) {
+func (mq *MessageQueue) NotifyConsumers(topic Topic, msg Message) {
 	mq.mu.Lock()
 
-	for id, channel := range mq.channels {
-		log.Printf("notifying channel %s of message", id)
+	for id, channel := range topic.channels {
+		log.Printf("notifying channel %s in topic %s of message", id, topic.name)
 		channel <- msg
 	}
 

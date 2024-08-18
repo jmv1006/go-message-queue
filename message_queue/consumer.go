@@ -8,8 +8,13 @@ import (
 	"net"
 )
 
-func (mq *MessageQueue) CreateConsumerStream(connPtr *net.TCPConn) {
+func (mq *MessageQueue) CreateConsumerStream(req *StandardRequest, connPtr *net.TCPConn) {
 	conn := *connPtr
+
+	topicName := req.Topic
+
+	// Check if topic exists
+	topic := mq.ValidateTopic(topicName)
 
 	// Create a new channel
 	consumerChan := make(chan Message)
@@ -17,7 +22,7 @@ func (mq *MessageQueue) CreateConsumerStream(connPtr *net.TCPConn) {
 
 	// Updating channels map
 	mq.mu.Lock()
-	mq.channels[id.String()] = consumerChan
+	topic.channels[id.String()] = consumerChan
 	mq.mu.Unlock()
 
 	// metrics
@@ -40,11 +45,13 @@ func (mq *MessageQueue) CreateConsumerStream(connPtr *net.TCPConn) {
 
 		// Deleting channel from map
 		mq.mu.Lock()
-		delete(mq.channels, id.String())
+		delete(topic.channels, id.String())
 		mq.mu.Unlock()
 	}()
 
-	log.Printf("consumer %s connected to server", conn.LocalAddr())
+	if mq.cfg.Debug {
+		log.Printf("consumer %s connected to the server as a consumer stream", conn.LocalAddr())
+	}
 
 	// Heartbeat checker
 	go mq.checkConnectionHeartbeat(connPtr, consumerChan)

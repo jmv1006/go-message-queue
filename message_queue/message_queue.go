@@ -1,7 +1,9 @@
 package mesage_queue
 
 import (
-	"bufio"
+	"bytes"
+	"fmt"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -15,12 +17,13 @@ type MessageQueueConfig struct {
 	Protocol       string
 	Wg             *sync.WaitGroup
 	MetricsHandler *metrics.MetricsHandler
+	Debug          bool
 }
 
 type MessageQueue struct {
-	cfg      MessageQueueConfig
-	channels map[string]chan Message
-	mu       sync.Mutex
+	cfg    MessageQueueConfig
+	topics map[string]Topic
+	mu     sync.Mutex
 }
 
 type Message struct {
@@ -29,12 +32,18 @@ type Message struct {
 }
 
 type StandardRequest struct {
-	Type string `json:"type"`
-	Body string `json:"body"`
+	Type  string `json:"type"`
+	Body  string `json:"body"`
+	Topic string `json:"topic"`
+}
+
+type Topic struct {
+	name     string
+	channels map[string]chan Message
 }
 
 func New(config MessageQueueConfig) *MessageQueue {
-	return &MessageQueue{cfg: config, channels: make(map[string]chan Message)}
+	return &MessageQueue{cfg: config, topics: make(map[string]Topic)}
 }
 
 func (mq *MessageQueue) Start() {
@@ -62,20 +71,40 @@ func (mq *MessageQueue) Start() {
 			continue
 		}
 
+		if mq.cfg.Debug {
+			log.Printf("%s has connected to the server", conn.LocalAddr())
+		}
+
 		// handle this connection on another thread
 		go mq.handleConnection(conn)
+
 	}
 
 }
 
 func (mq *MessageQueue) handleConnection(connPtr *net.TCPConn) {
-	// Read from connection
-	scanner := bufio.NewScanner(connPtr)
+	initialBuffer := make([]byte, 1000)
 
-	for scanner.Scan() {
-		req := Decode(scanner.Bytes())
+	for {
+		buff := bytes.NewBuffer(initialBuffer)
+
+		written, err := connPtr.Read(buff.Bytes())
+		if err != nil {
+			if err != io.EOF {
+				if mq.cfg.Debug {
+					fmt.Println("read error:", err)
+				}
+			}
+			break
+		}
+
+		writtenBytes := buff.Bytes()[:written]
+
+		req := Decode(writtenBytes)
 
 		if req == nil {
+			continue
+		} else if req.Topic == "" {
 			continue
 		}
 
@@ -83,7 +112,7 @@ func (mq *MessageQueue) handleConnection(connPtr *net.TCPConn) {
 			mq.ProduceMessage(req, connPtr)
 		} else if req.Type == "CONSUME" {
 			// This will become a consuming connection
-			mq.CreateConsumerStream(connPtr)
+			mq.CreateConsumerStream(req, connPtr)
 		}
 	}
 
@@ -100,8 +129,32 @@ func (mq *MessageQueue) checkConnectionHeartbeat(conn *net.TCPConn, channel chan
 			return
 		}
 
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 5)
 	}
+}
+
+// ValidateTopic checks if a topic exists & creates it if it does not
+func (mq *MessageQueue) ValidateTopic(name string) Topic {
+	mq.mu.Lock()
+
+	topic, exists := mq.topics[name]
+
+	if !exists {
+		// create this topic, it does not exist
+		topic = Topic{
+			name:     name,
+			channels: make(map[string]chan Message),
+		}
+
+		mq.topics[name] = topic
+
+		// metrics
+		mq.cfg.MetricsHandler.AddTopic()
+	}
+
+	mq.mu.Unlock()
+
+	return topic
 }
 
 func (mq *MessageQueue) GetMutex() *sync.Mutex {
