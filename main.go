@@ -17,7 +17,7 @@ func main() {
 	listenerAddress := os.Getenv("LISTENER_ADDRESS")
 
 	if listenerAddress == "" {
-		listenerAddress = "localhost:8000" // default
+		listenerAddress = "0.0.0.0:8000" // default
 	}
 
 	mh := metrics.NewMetricsHandler()
@@ -30,7 +30,7 @@ func main() {
 		Protocol:       "tcp",
 		Wg:             &wg,
 		MetricsHandler: mh,
-		Debug:          true,
+		Debug:          false,
 	}
 
 	mq := mesage_queue.New(mqConfig)
