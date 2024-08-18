@@ -20,7 +20,7 @@ while a __CONSUME__ request will consume any new messages written to the queue
 by other clients.
 
 Messages are seperated into topics - each request must specify a topic name. If the provided topic does not exist, it will
-be created automatically
+be created automatically.
 
 ## Environment Variables:
 - LISTENER_ADDRESS (required): The full address & port where the program will listen for incoming requests
