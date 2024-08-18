@@ -23,6 +23,7 @@ type MessageQueueConfig struct {
 type MessageQueue struct {
 	cfg      MessageQueueConfig
 	channels map[string]chan Message
+	topics   map[string]Topic
 	mu       sync.Mutex
 }
 
@@ -32,12 +33,18 @@ type Message struct {
 }
 
 type StandardRequest struct {
-	Type string `json:"type"`
-	Body string `json:"body"`
+	Type  string `json:"type"`
+	Body  string `json:"body"`
+	Topic string `json:"topic"`
+}
+
+type Topic struct {
+	name     string
+	channels map[string]chan Message
 }
 
 func New(config MessageQueueConfig) *MessageQueue {
-	return &MessageQueue{cfg: config, channels: make(map[string]chan Message)}
+	return &MessageQueue{cfg: config, channels: make(map[string]chan Message), topics: make(map[string]Topic)}
 }
 
 func (mq *MessageQueue) Start() {
@@ -98,13 +105,15 @@ func (mq *MessageQueue) handleConnection(connPtr *net.TCPConn) {
 
 		if req == nil {
 			continue
+		} else if req.Topic == "" {
+			continue
 		}
 
 		if req.Type == "PRODUCE" {
 			mq.ProduceMessage(req, connPtr)
 		} else if req.Type == "CONSUME" {
 			// This will become a consuming connection
-			mq.CreateConsumerStream(connPtr)
+			mq.CreateConsumerStream(req, connPtr)
 		}
 	}
 
@@ -123,6 +132,30 @@ func (mq *MessageQueue) checkConnectionHeartbeat(conn *net.TCPConn, channel chan
 
 		time.Sleep(time.Second * 5)
 	}
+}
+
+// ValidateTopic checks if a topic exists & creates it if it does not
+func (mq *MessageQueue) ValidateTopic(name string) Topic {
+	mq.mu.Lock()
+
+	topic, exists := mq.topics[name]
+
+	if !exists {
+		// create this topic, it does not exist
+		topic = Topic{
+			name:     name,
+			channels: make(map[string]chan Message),
+		}
+
+		mq.topics[name] = topic
+
+		// metrics
+		mq.cfg.MetricsHandler.AddTopic()
+	}
+
+	mq.mu.Unlock()
+
+	return topic
 }
 
 func (mq *MessageQueue) GetMutex() *sync.Mutex {

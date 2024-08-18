@@ -10,6 +10,7 @@ type MetricsHandler struct {
 	Received       int
 	Sent           int
 	ActiveChannels int
+	Topics         int
 }
 
 func NewMetricsHandler() *MetricsHandler {
@@ -32,6 +33,10 @@ func (m *MetricsHandler) RemoveChannel() {
 	m.ActiveChannels -= 1
 }
 
+func (m *MetricsHandler) AddTopic() {
+	m.Topics += 1
+}
+
 func (m *MetricsHandler) StartMetricsLoop(delayInSeconds int, mqMutex *sync.Mutex) {
 	duration := time.Second * time.Duration(delayInSeconds)
 
@@ -41,6 +46,7 @@ func (m *MetricsHandler) StartMetricsLoop(delayInSeconds int, mqMutex *sync.Mute
 		log.Printf("%d events recieved", m.Received)
 		log.Printf("%d events sent", m.Sent)
 		log.Printf("%d active channels", m.ActiveChannels)
+		log.Printf("%d topics", m.Topics)
 		log.Printf("--------------------")
 
 		mqMutex.Unlock()
