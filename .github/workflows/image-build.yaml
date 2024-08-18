@@ -26,3 +26,4 @@ jobs:
         with:
           push: true
           tags: jmv1006/go-message-queue:latest
+          platforms: linux/amd64,linux/arm64
