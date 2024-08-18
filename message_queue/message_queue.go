@@ -1,7 +1,9 @@
 package mesage_queue
 
 import (
-	"bufio"
+	"bytes"
+	"fmt"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -62,18 +64,52 @@ func (mq *MessageQueue) Start() {
 			continue
 		}
 
+		log.Printf("%s has connected to the server", conn.LocalAddr())
+
 		// handle this connection on another thread
 		go mq.handleConnection(conn)
+
 	}
 
 }
 
 func (mq *MessageQueue) handleConnection(connPtr *net.TCPConn) {
 	// Read from connection
-	scanner := bufio.NewScanner(connPtr)
+	/*
+		scanner := bufio.NewScanner(connPtr)
 
-	for scanner.Scan() {
-		req := Decode(scanner.Bytes())
+		for scanner.Scan() {
+			req := Decode(scanner.Bytes())
+
+			if req == nil {
+				continue
+			}
+
+			if req.Type == "PRODUCE" {
+				mq.ProduceMessage(req, connPtr)
+			} else if req.Type == "CONSUME" {
+				// This will become a consuming connection
+				mq.CreateConsumerStream(connPtr)
+			}
+		}
+	*/
+
+	initialBuffer := make([]byte, 1000)
+
+	for {
+		buff := bytes.NewBuffer(initialBuffer)
+
+		written, err := connPtr.Read(buff.Bytes())
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println("read error:", err)
+			}
+			break
+		}
+
+		writtenBytes := buff.Bytes()[:written]
+
+		req := Decode(writtenBytes)
 
 		if req == nil {
 			continue
@@ -100,7 +136,7 @@ func (mq *MessageQueue) checkConnectionHeartbeat(conn *net.TCPConn, channel chan
 			return
 		}
 
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 5)
 	}
 }
 
