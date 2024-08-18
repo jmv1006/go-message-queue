@@ -21,10 +21,9 @@ type MessageQueueConfig struct {
 }
 
 type MessageQueue struct {
-	cfg      MessageQueueConfig
-	channels map[string]chan Message
-	topics   map[string]Topic
-	mu       sync.Mutex
+	cfg    MessageQueueConfig
+	topics map[string]Topic
+	mu     sync.Mutex
 }
 
 type Message struct {
@@ -44,7 +43,7 @@ type Topic struct {
 }
 
 func New(config MessageQueueConfig) *MessageQueue {
-	return &MessageQueue{cfg: config, channels: make(map[string]chan Message), topics: make(map[string]Topic)}
+	return &MessageQueue{cfg: config, topics: make(map[string]Topic)}
 }
 
 func (mq *MessageQueue) Start() {
