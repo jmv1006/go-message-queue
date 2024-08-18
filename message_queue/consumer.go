@@ -44,7 +44,9 @@ func (mq *MessageQueue) CreateConsumerStream(connPtr *net.TCPConn) {
 		mq.mu.Unlock()
 	}()
 
-	log.Printf("consumer %s connected to server as a consumer stream", conn.LocalAddr())
+	if mq.cfg.Debug {
+		log.Printf("consumer %s connected to server as a consumer stream", conn.LocalAddr())
+	}
 
 	// Heartbeat checker
 	go mq.checkConnectionHeartbeat(connPtr, consumerChan)

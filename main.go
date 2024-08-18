@@ -30,6 +30,7 @@ func main() {
 		Protocol:       "tcp",
 		Wg:             &wg,
 		MetricsHandler: mh,
+		Debug:          true,
 	}
 
 	mq := mesage_queue.New(mqConfig)

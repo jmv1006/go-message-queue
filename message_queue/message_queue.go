@@ -17,6 +17,7 @@ type MessageQueueConfig struct {
 	Protocol       string
 	Wg             *sync.WaitGroup
 	MetricsHandler *metrics.MetricsHandler
+	Debug          bool
 }
 
 type MessageQueue struct {
@@ -64,7 +65,9 @@ func (mq *MessageQueue) Start() {
 			continue
 		}
 
-		log.Printf("%s has connected to the server", conn.LocalAddr())
+		if mq.cfg.Debug {
+			log.Printf("%s has connected to the server", conn.LocalAddr())
+		}
 
 		// handle this connection on another thread
 		go mq.handleConnection(conn)
@@ -74,26 +77,6 @@ func (mq *MessageQueue) Start() {
 }
 
 func (mq *MessageQueue) handleConnection(connPtr *net.TCPConn) {
-	// Read from connection
-	/*
-		scanner := bufio.NewScanner(connPtr)
-
-		for scanner.Scan() {
-			req := Decode(scanner.Bytes())
-
-			if req == nil {
-				continue
-			}
-
-			if req.Type == "PRODUCE" {
-				mq.ProduceMessage(req, connPtr)
-			} else if req.Type == "CONSUME" {
-				// This will become a consuming connection
-				mq.CreateConsumerStream(connPtr)
-			}
-		}
-	*/
-
 	initialBuffer := make([]byte, 1000)
 
 	for {
@@ -102,7 +85,9 @@ func (mq *MessageQueue) handleConnection(connPtr *net.TCPConn) {
 		written, err := connPtr.Read(buff.Bytes())
 		if err != nil {
 			if err != io.EOF {
-				fmt.Println("read error:", err)
+				if mq.cfg.Debug {
+					fmt.Println("read error:", err)
+				}
 			}
 			break
 		}
