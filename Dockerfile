@@ -7,7 +7,7 @@ COPY . .
 RUN go mod download
 
 # Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o /go-message-queue
+RUN CGO_ENABLED=0 GOOS=linux go build -o /go-message-queue
 
 FROM gcr.io/distroless/base
 COPY --from=build /go-message-queue /go-message-queue
