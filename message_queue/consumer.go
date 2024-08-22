@@ -1,11 +1,10 @@
 package mesage_queue
 
 import (
-	"encoding/base64"
-	"encoding/json"
-	"github.com/google/uuid"
 	"log"
 	"net"
+
+	"github.com/google/uuid"
 )
 
 func (mq *MessageQueue) CreateConsumerStream(req *StandardRequest, connPtr *net.TCPConn) {
@@ -17,7 +16,7 @@ func (mq *MessageQueue) CreateConsumerStream(req *StandardRequest, connPtr *net.
 	topic := mq.ValidateTopic(topicName)
 
 	// Create a new channel
-	consumerChan := make(chan Message)
+	consumerChan := make(chan string)
 	id := uuid.New()
 
 	// Updating channels map
@@ -58,14 +57,7 @@ func (mq *MessageQueue) CreateConsumerStream(req *StandardRequest, connPtr *net.
 
 	// Listen for queue updates - does not stop until the channel is closed
 	for msg := range consumerChan {
-		// marshal message
-		jsonMsg, _ := json.Marshal(msg)
-
-		resultMsg := make([]byte, 1000)
-
-		base64.StdEncoding.Encode(resultMsg, jsonMsg)
-
-		_, err := conn.Write(resultMsg)
+		_, err := conn.Write([]byte(msg))
 
 		if err != nil {
 			log.Printf("error producing message: %s", err)

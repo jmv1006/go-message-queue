@@ -39,7 +39,7 @@ type StandardRequest struct {
 
 type Topic struct {
 	name     string
-	channels map[string]chan Message
+	channels map[string]chan string
 }
 
 func New(config MessageQueueConfig) *MessageQueue {
@@ -118,7 +118,7 @@ func (mq *MessageQueue) handleConnection(connPtr *net.TCPConn) {
 
 }
 
-func (mq *MessageQueue) checkConnectionHeartbeat(conn *net.TCPConn, channel chan Message) {
+func (mq *MessageQueue) checkConnectionHeartbeat(conn *net.TCPConn, channel chan string) {
 	for {
 		one := make([]byte, 1)
 		_, err := conn.Write(one)
@@ -143,7 +143,7 @@ func (mq *MessageQueue) ValidateTopic(name string) Topic {
 		// create this topic, it does not exist
 		topic = Topic{
 			name:     name,
-			channels: make(map[string]chan Message),
+			channels: make(map[string]chan string),
 		}
 
 		mq.topics[name] = topic

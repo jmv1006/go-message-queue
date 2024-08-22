@@ -1,6 +1,8 @@
 package mesage_queue
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"log"
 	"net"
 	"time"
@@ -44,9 +46,18 @@ func (mq *MessageQueue) ProduceMessage(msg *StandardRequest, connPtr *net.TCPCon
 func (mq *MessageQueue) NotifyConsumers(topic Topic, msg Message) {
 	mq.mu.Lock()
 
+	// Encode messagee
+	marshaled, err := json.Marshal(msg)
+
+	if err != nil {
+		return
+	}
+
+	encoded := base64.StdEncoding.EncodeToString(marshaled)
+
 	for id, channel := range topic.channels {
 		log.Printf("notifying channel %s in topic %s of message", id, topic.name)
-		channel <- msg
+		channel <- encoded
 	}
 
 	mq.mu.Unlock()
