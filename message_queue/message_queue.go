@@ -16,7 +16,7 @@ type MessageQueueConfig struct {
 	Address        string
 	Protocol       string
 	Wg             *sync.WaitGroup
-	MetricsHandler *metrics.MetricsHandler
+	MetricsHandler *metrics.Handler
 	Debug          bool
 }
 

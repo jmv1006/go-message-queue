@@ -1,56 +1,59 @@
 package metrics
 
 import (
-	"log"
-	"sync"
-	"time"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-type MetricsHandler struct {
-	Received       int
-	Sent           int
-	ActiveChannels int
-	Topics         int
+var (
+	messagesReceived = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "messages_received",
+		Help: "The total number of received messages",
+	})
+
+	messagesSent = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "messages_sent",
+		Help: "The total number of messages sent from the server",
+	})
+
+	activeChannels = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "active_channels",
+		Help: "The total number of active channels/connections",
+	})
+
+	topics = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "topics",
+		Help: "The total number of topics created",
+	})
+)
+
+type Handler struct {
+	Received       prometheus.Counter
+	Sent           prometheus.Counter
+	ActiveChannels prometheus.Gauge
+	Topics         prometheus.Counter
 }
 
-func NewMetricsHandler() *MetricsHandler {
-	return &MetricsHandler{Received: 0, Sent: 0}
+func NewMetricsHandler() *Handler {
+	return &Handler{Received: messagesReceived, Sent: messagesSent, ActiveChannels: activeChannels, Topics: topics}
 }
 
-func (m *MetricsHandler) AddSent() {
-	m.Sent += 1
+func (m *Handler) AddSent() {
+	m.Sent.Inc()
 }
 
-func (m *MetricsHandler) AddReceived() {
-	m.Received += 1
+func (m *Handler) AddReceived() {
+	m.Received.Inc()
 }
 
-func (m *MetricsHandler) AddChannel() {
-	m.ActiveChannels += 1
+func (m *Handler) AddChannel() {
+	m.ActiveChannels.Inc()
 }
 
-func (m *MetricsHandler) RemoveChannel() {
-	m.ActiveChannels -= 1
+func (m *Handler) RemoveChannel() {
+	m.ActiveChannels.Dec()
 }
 
-func (m *MetricsHandler) AddTopic() {
-	m.Topics += 1
-}
-
-func (m *MetricsHandler) StartMetricsLoop(delayInSeconds int, mqMutex *sync.Mutex) {
-	duration := time.Second * time.Duration(delayInSeconds)
-
-	for {
-		mqMutex.Lock()
-		// Print metrics
-		log.Printf("%d events recieved", m.Received)
-		log.Printf("%d events sent", m.Sent)
-		log.Printf("%d active channels", m.ActiveChannels)
-		log.Printf("%d topics", m.Topics)
-		log.Printf("--------------------")
-
-		mqMutex.Unlock()
-
-		time.Sleep(duration)
-	}
+func (m *Handler) AddTopic() {
+	m.Topics.Inc()
 }

@@ -1,7 +1,9 @@
 package main
 
 import (
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
+	"net/http"
 	"os"
 	"sync"
 
@@ -38,10 +40,26 @@ func main() {
 	// Starting a listener for producers
 	go mq.Start()
 
-	// Starting metrics handler
-	go mh.StartMetricsLoop(10, mq.GetMutex())
+	// Starting HTTP Listener
+	go startHttpApp()
 
 	log.Printf("Listening for tcp connections on %s TCP...", listenerAddress)
 
 	wg.Wait()
+}
+
+func startHttpApp() {
+	addr := os.Getenv("HTTP_LISTENER")
+
+	if len(addr) == 0 {
+		addr = "localhost:8080"
+	}
+
+	http.Handle("/metrics", promhttp.Handler())
+
+	err := http.ListenAndServe(addr, nil)
+
+	if err != nil {
+		panic(err)
+	}
 }
