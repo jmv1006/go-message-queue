@@ -56,7 +56,9 @@ func (mq *MessageQueue) NotifyConsumers(topic Topic, msg Message) {
 	encoded := base64.StdEncoding.EncodeToString(marshaled)
 
 	for id, channel := range topic.channels {
-		log.Printf("notifying channel %s in topic %s of message", id, topic.name)
+		if mq.cfg.Debug {
+			log.Printf("notifying channel %s in topic %s of message", id, topic.name)
+		}
 		channel <- encoded
 	}
 
